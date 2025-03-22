@@ -10,7 +10,8 @@ module top (
 
         logic ir_ready;
 	logic ctl_valid;
-        logic [31:0] command;
+        logic [31:0] nec_signal;
+	logic [2:0] command;
 
 
         control
@@ -67,8 +68,17 @@ module top (
 		.enable(ctl_valid),
 		.ir_input(gpio[0]),
 		.ready(ir_ready),
-		.command(command),
+		.command(nec_signal),
 		.test(1'd0)
+	);
+
+
+
+	ir_check ir_check_inst (
+		.clk(clk25),
+		.rst(key[0]),
+		.nec_signal(nec_signal),
+		.command(command)
 	);	
 
 endmodule
