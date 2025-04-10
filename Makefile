@@ -1,5 +1,5 @@
 NAME = cart
-VERILOG += top.sv ./motor_drv/motor_drv.sv ./control/control.sv ./servo_pdm/servo_pdm.v ./ir_decoder/ir_decoder.v
+VERILOG += top.sv ./motor_drv/motor_drv.sv ./control/control.sv ./servo_pdm/servo_pdm.v ./ir_decoder/ir_decoder.v ./adc_hysteresis/adc_hysteresis.sv
 INC = ./
 LPF = ./control/karnix_cabga256.lpf
 DEVICE = 25k
@@ -49,7 +49,7 @@ endif
 fw: $(NAME).bit
 
 $(NAME).bit: $(LPF) $(VERILOG)
-	yosys -p "verilog_defaults -add -I$(subst :, -I,$(INC))" -p "read_verilog -sv $(VERILOG)" -p "synth_ecp5 -noabc9 -json $(NAME).json -top top" -l $(NAME).yosys.log
+	yosys -p "verilog_defaults -add -I$(subst :, -I,$(INC))" -p "read_verilog -sv $(VERILOG)" -p "synth_ecp5 -json $(NAME).json -top top" -l $(NAME).yosys.log
 	nextpnr-ecp5 --package $(PACKAGE) --$(DEVICE) --json $(NAME).json --textcfg $(NAME)_out.config --lpf $(LPF) --lpf-allow-unconstrained -l $(NAME).nextpnr.log 
 	ecppack --compress --freq 38.8 --input $(NAME)_out.config --bit $(NAME).bit
 	$(MAKE) check

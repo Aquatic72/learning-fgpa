@@ -1,18 +1,19 @@
 module adc_hysteresis 
 # (
-	x_High = 12'd3000,		
-	x_Low = 12'd1000
+	parameter high = 12'd3000,		
+	parameter low = 12'd1000,
+	parameter clk_hz = 25000000
 ) (
 	input  clk,
-	input  logic [11:0] signal,		// Digital signal from ADC
-	output logic can_move_fwd
+	input  rst,				// Global RESET
+	input  logic [11:0] d_signal,		// Digital signal from ADC
+	output logic can_move_fwd		// Can move forward? (True/False)
 );
-
-	always_ff @(posedge clk) begin
-		if (signal < x_Low)
-			can_move_fwd <= 1;
-		else if (signal > x_High)
-			can_move_fwd <= 0;
+	always_ff @(posedge clk or posedge rst) begin
+		if (rst) can_move_fwd <= 0;
+		else begin
+			if (d_signal < low) can_move_fwd <= 0;
+			else if (d_signal > high) can_move_fwd <= 1;
+		end
 	end
-
 endmodule
