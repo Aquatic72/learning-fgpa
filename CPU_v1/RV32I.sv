@@ -1,10 +1,10 @@
 module RV32I (
 	input  logic clk,
 	input  logic rst,
-	input  logic en,		// CPU doesn't work but sticked with instruction memory and data mamory buses
+	input  logic en,		// CPU doesn't work but sticked with instruction memory and data memory buses
 	input  logic hold,		// CPU doesn't work and separated from instruction memory and data memory buses
 
-	output logic [11:0] pc,		// Instruction address in instruction memory (128 32-bit words, 512 memory cells)
+	output logic [5:0] pc,		// Instruction address in instruction memory (128 32-bit words, 512 memory cells)
 	input  logic [31:0] ins,	// Instruction (32-bit)
 	output logic [11:0] daddr,	// Data address in data memory
 	inout  logic [31:0] ddata,	// Data (32-bit)
@@ -16,22 +16,27 @@ module RV32I (
 	output logic sf			// Operation in ALU finished with pos (1) or neg (0) number
 );
 
-	localparam int R   = 1,		// Setting up indexes for all formations (instruction types, RISUBJ)
-		   int I1  = 2,
-		   int I2  = 3,
-		   int I3  = 4,
-		   int I4  = 5,
-		   int S   = 6,
-		   int U1  = 7,
-		   int U2  = 8,
-		   int B   = 9,
-		   int J   = 10,
-		   int UWN = 0;		// UKNOWN instruction type
+	localparam int R   = 1;		// Setting up indexes for all formations (instruction types, RISUBJ)
+	localparam int I1  = 2;
+	localparam int I2  = 3;
+	localparam int I3  = 4;
+	localparam int I4  = 5;
+	localparam int S   = 6;
+	localparam int U1  = 7;
+	localparam int U2  = 8;
+	localparam int B   = 9;
+	localparam int J   = 10;
+	localparam int UWN = 0;		// UKNOWN instruction type
 
 	logic [6:0]  opcode;
 	logic [4:0]  rs1;
 	logic [4:0]  rs2;
 	logic [4:0]  rd;
+
+	logic [21:0] imm;
+
+	logic [2:0] funct3;
+	logic [6:0] funct7;
 
 	logic [2:0] type;
 
@@ -49,7 +54,8 @@ module RV32I (
 		if (rst) begin			// Resetting all output regs
 			
 			pc    <= 12'd0;
-
+			
+			type  <= UWN;			
 			drw   <= 1'd0;
 			fault <= 1'd0;
 			zf    <= 1'd0;
@@ -57,13 +63,37 @@ module RV32I (
 			sf    <= 1'd0;			
 
 		end
-
 	end
 
 
 	assign opcode[6:0] = ins[6:0];
+	assign zf = (rd == 32'd0);
+	assign sf = rd[31];
+
+	assign type = UWN;
+	assign fault = 1'd0;
+	assign rs1 = 5'd0;
+	assign rs2 = 5'd0;
+	assign rd = 5'd0;
+	assign imm = 21'd0;
+	assign funct3 = 3'd0;
+	assign funct7 = 7'd0;
+
+	assign cf = 1'd0;
+
 
 	always_comb begin
+
+//		type = UWN;
+//		fault = 1'd0;
+//		rs1 = 5'd0;
+//		rs2 = 5'd0;
+//		rd = 5'd0;
+//		imm = 21'd0;
+//		funct3 = 3'd0;
+//		funct7 = 7'd0;
+
+//		cf = 1'd0;
 
 		case (opcode)								// Defining instruction type (ID) 
 			7'b0110011: type = R;
@@ -126,10 +156,20 @@ module RV32I (
 				rd[4:0]   = ins[11:7];
 				imm[20:0] = {ins[31], ins[19:12], ins[20], ins[30:21], 1'b0};
 			end
+
+			default: begin
+				fault = 1'd1;
+				rs1 = 5'd0;
+				rs2 = 5'd0;
+				rd = 5'd0;
+				imm = 21'd0;
+				funct3 = 3'd0;
+				funct7 = 7'd0;
+			end
 		endcase
 
-		zf = (rd == 32'd0);
-		sf = rd[31];
+//		zf = (rd == 32'd0);
+//		sf = rd[31];
 
 		if (type == R) begin							// Executing instructions in ALU (EX)
 			case (funct3)
@@ -169,13 +209,14 @@ module RV32I (
 					end else if (funct7 == 7'h20) begin
 						rd = $signed(rs1) >>> $signed(rs2);		//sra
 
-					end else begin
-						fault = 1'd1//fault
-					end
+					end else fault = 1'd1;		//fault
 				end
 
 				3'h2: rd = ($signed(rs1) < $signed(rs2)) ? 1 : 0;		//slt
 				3'h3: rd = (rs1 < rs2) ? 1 : 0;					//sltu
+				
+				default: fault = 1'd1;
+			
 			endcase
 
 
@@ -183,10 +224,10 @@ module RV32I (
 		end else if (type == I1) begin
 			case (funct3)
 
-				3'h0: //addi
-				3'h4: //xori
-				3'h6: //ori
-				3'h7: //andi
+//				3'h0: //addi
+//				3'h4: //xori
+//				3'h6: //ori
+//				3'h7: //andi
 
 				3'h1: if (imm[11:5] == 7'h0) begin
 						//slli
@@ -202,8 +243,11 @@ module RV32I (
 						//fault
 					end
 
-				3'h2: //slti
-				3'h3: //sltiu				
+//				3'h2: //slti
+//				3'h3: //sltiu	
+
+				default: fault = 1'd1;
+			
 			endcase
 
 
@@ -211,13 +255,13 @@ module RV32I (
 		end else if (type == I2) begin
 			case (funct3)
 
-				3'h0: //lb
-				3'h1: //lh
-				3'h2: //lw
-				3'h4: //lbu
-				3'h5: //lhu
+//				3'h0: //lb
+//				3'h1: //lh
+//				3'h2: //lw
+//				3'h4: //lbu
+//				3'h5: //lhu
 
-				default: //fault
+//				default: //fault
 			endcase
 
 
@@ -225,11 +269,11 @@ module RV32I (
 		end else if (type == S) begin
 			case (funct3)
 
-				3'h0: //sb
-				3'h1: //sh
-				3'h2: //sw
+//				3'h0: //sb
+//				3'h1: //sh
+//				3'h2: //sw
 
-				default: //fault
+//				default: //fault
 
 			endcase
 
@@ -238,14 +282,14 @@ module RV32I (
 		end else if (type == B) begin
 			case (funct3)
 
-				3'h0: //beq
-				3'h1: //bne
-				3'h4: //blt
-				3'h5: //bge
-				3'h6: //bltu
-				3'h7: //bgeu
+//				3'h0: //beq
+//				3'h1: //bne
+//				3'h4: //blt
+//				3'h5: //bge
+//				3'h6: //bltu
+//				3'h7: //bgeu
 
-				default: //fault
+//				default: //fault
 			endcase
 
 		end else if (type == J) begin
@@ -263,10 +307,10 @@ module RV32I (
 		end else if (type == I4) begin
 			case (imm)
 
-				32'h0: //ecall
-				32'h1: //ebreak
+//				32'h0: //ecall
+//				32'h1: //ebreak
 
-				default: //fault
+//				default: //fault
 			endcase
 		
 		end else begin
